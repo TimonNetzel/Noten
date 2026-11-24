@@ -27,6 +27,7 @@ where = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
 markers = ["slow: Fit-Smoketests mit MCMC (einige Sekunden bis Minuten)"]
+filterwarnings = ["ignore:PyTensor could not link to a BLAS:UserWarning"]
 
 [tool.ruff]
 line-length = 100

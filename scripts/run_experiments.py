@@ -206,6 +206,7 @@ def _recovery_job(scen_name: str, run: int, quick: bool, sampler: SamplerConfig)
         "run": run,
         "seed": seed,
         "seconds": time.time() - t0,
+        "delta_fix": True,  # Vergleichswert delta_v - mean(b) (ab Commit "Recovery: ...delta_v")
         **diag,
         **cal,
         **extra,
@@ -280,6 +281,8 @@ def summarize_recovery(ctx: Ctx, scenarios=None):
     rec = []
     for r in runs:
         for row in r["rows"]:
+            if row["param"] == "delta_v" and not r.get("delta_fix", False):
+                continue  # alter, falsch definierter Vergleichswert (siehe ERGEBNISSE.md)
             rec.append({"scenario": r["scenario"], "run": r["run"], "ok": r["ok"], **row})
     rec = pd.DataFrame(rec)
     rec.to_csv(ctx.out / "results" / "recovery_rows.csv", index=False)
@@ -361,7 +364,11 @@ def summarize_recovery(ctx: Ctx, scenarios=None):
     # PIT-Histogramme
     fig, axes = plt.subplots(2, (len(scenarios) + 1) // 2, figsize=(14, 6), squeeze=False)
     for ax, s in zip(axes.ravel(), scenarios, strict=False):
-        pits = np.concatenate([r["pit"] for r in runs if r["scenario"] == s])
+        pit_list = [r["pit"] for r in runs if r["scenario"] == s]
+        if not pit_list:
+            ax.axis("off")
+            continue
+        pits = np.concatenate(pit_list)
         ax.hist(pits, bins=10, range=(0, 1), color="#4C72B0", edgecolor="w")
         ax.axhline(len(pits) / 10, color="k", ls="--", lw=1)
         ax.set_title(s, fontsize=10)

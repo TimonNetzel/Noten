@@ -15,6 +15,7 @@ dependencies = [
     "arviz>=0.18",
     "matplotlib>=3.8",
     "scipy>=1.11",
+    "nutpie>=0.13",  # schneller NUTS-Sampler; Fallback auf pm.sample, falls nicht installiert
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,7 @@ where = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
 markers = ["slow: Fit-Smoketests mit MCMC (einige Sekunden bis Minuten)"]
+filterwarnings = ["ignore:PyTensor could not link to a BLAS:UserWarning"]
 
 [tool.ruff]
 line-length = 100

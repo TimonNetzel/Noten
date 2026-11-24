@@ -63,7 +63,9 @@ def diagnostics(idata, var_names=None) -> dict:
         return float(min(np.nanmin(np.asarray(ds[v].values)) for v in ds.data_vars))
 
     div = int(np.asarray(idata.sample_stats["diverging"].values).sum())
+    worst = max(rhat.data_vars, key=lambda v: float(np.nanmax(np.asarray(rhat[v].values))))
     out = {
+        "rhat_worst_var": str(worst),
         "rhat_max": _max(rhat),
         "ess_bulk_min": _min(ess_b),
         "ess_tail_min": _min(ess_t),

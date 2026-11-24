@@ -228,7 +228,9 @@ def run_recovery(ctx: Ctx, scenarios=None):
     if jobs:
         import multiprocessing as mp
 
-        with ProcessPoolExecutor(ctx.workers, mp_context=mp.get_context("spawn")) as ex:
+        with ProcessPoolExecutor(
+            ctx.workers, mp_context=mp.get_context("spawn"), max_tasks_per_child=8
+        ) as ex:
             futs = {ex.submit(_recovery_job, s, r, ctx.quick, ctx.sampler): (s, r) for s, r in jobs}
             for i, f in enumerate(as_completed(futs), 1):
                 s, r = futs[f]
@@ -444,7 +446,9 @@ def run_loo(ctx: Ctx):
 
     jobs = [(s, r, v) for s in LOO_SCENARIOS for r in range(ctx.loo_reps) for v in VARIANTS]
     res = []
-    with ProcessPoolExecutor(ctx.workers, mp_context=mp.get_context("spawn")) as ex:
+    with ProcessPoolExecutor(
+        ctx.workers, mp_context=mp.get_context("spawn"), max_tasks_per_child=8
+    ) as ex:
         futs = [ex.submit(_loo_job, *j, ctx.quick, ctx.sampler) for j in jobs]
         for f in as_completed(futs):
             try:
@@ -533,7 +537,9 @@ def run_sensitivity(ctx: Ctx):
 
     jobs = [(s, lab, ny) for s in ("b_rho05", "e_drift") for ny in (3, 1) for lab in SENS]
     res = []
-    with ProcessPoolExecutor(ctx.workers, mp_context=mp.get_context("spawn")) as ex:
+    with ProcessPoolExecutor(
+        ctx.workers, mp_context=mp.get_context("spawn"), max_tasks_per_child=8
+    ) as ex:
         futs = [ex.submit(_sens_job, s, lab, ctx.quick, ctx.sampler, ny) for s, lab, ny in jobs]
         for f in as_completed(futs):
             res.append(f.result())

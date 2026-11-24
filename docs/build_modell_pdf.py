@@ -29,6 +29,7 @@ from reportlab.platypus import (
     Frame,
     Image,
     KeepTogether,
+    PageBreak,
     PageTemplate,
     Paragraph,
     Spacer,
@@ -105,13 +106,14 @@ def tex_img(tex: str, size: float = 12.0, dpi: int = 420) -> Image:
     return Image(buf, width=w * k, height=h * k)
 
 
-def eq(*texs: str):
-    """Nummerierte Display-Gleichung (mehrere Zeilen = mehrere Bilder, Nummer in der ersten)."""
-    _eq[0] += 1
+def eq(*texs: str, numbered: bool = True):
+    """Display-Gleichung (mehrere Zeilen = mehrere Bilder, Nummer in der ersten)."""
+    if numbered:
+        _eq[0] += 1
     rows = []
     for j, t in enumerate(texs):
         img = tex_img(t)
-        rows.append([img, f"({_eq[0]})" if j == 0 else ""])
+        rows.append([img, f"({_eq[0]})" if (j == 0 and numbered) else ""])
     tb = Table(rows, colWidths=[CONTENT_W - 1.3 * cm, 1.3 * cm])
     tb.setStyle(TableStyle([
         ("ALIGN", (0, 0), (0, -1), "CENTER"), ("ALIGN", (1, 0), (1, -1), "RIGHT"),
@@ -233,6 +235,115 @@ def fig_info() -> Image:
 
 
 # ----------------------------------------------------------------------------- Inhalt
+def fig_example() -> Image:
+    th, sd = 2.71, 0.22
+    cut = np.array([1.5, 2.5, 3.5, 4.5, 5.5])
+    probs = np.diff(np.concatenate([[0], norm.cdf((cut - th) / sd), [1]]))
+    fig, ax = plt.subplots(figsize=(5.2, 1.9))
+    ax.bar(range(1, 7), probs, color=["#b9cde5" if p < 0.5 else "#1f3a5f" for p in probs], width=0.6)
+    for k, pr in enumerate(probs, 1):
+        ax.text(k, pr + 0.025, f"{100 * pr:.0f} %", ha="center", fontsize=8.5)
+    ax.set_xticks(range(1, 7))
+    ax.set_xlabel("Note", fontsize=9)
+    ax.set_yticks([])
+    ax.set_ylim(0, 1.05)
+    for s_ in ("top", "right", "left"):
+        ax.spines[s_].set_visible(False)
+    ax.tick_params(labelsize=9)
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return Image(buf, width=8.6 * cm, height=8.6 * cm * 1.9 / 5.2 * 0.95)
+
+
+def summary_pages():
+    s = []
+    s += [P("Zusammenfassung des Modells", h1),
+          P("<b>N</b><sub>i</sub> ist die Zeugnisnote von Schüler:in <i>i</i>, <b>Θ</b> der Vektor aller Parameter und latenten Größen "
+            "(Niveaus μ, u, b, Kanalmittel α, Streuungen, Schwellen c, Vornoten-Parameter). Daten sind die Klausuren <b>S</b>, "
+            "die mündlichen Noten <b>M</b>, die Vornoten <b>V</b> und, optional, das Lehrerurteil <b>D</b>. "
+            "Das Modell liefert die gemeinsame Posterior-Verteilung von Note und Parametern:"),
+          eq(r"P(N,\Theta\mid S,M,V,D)\ \propto\ P(N\mid\Theta)\cdot P(S\mid\Theta)\cdot P(M\mid\Theta)\cdot P(V\mid\Theta)"
+             r"\cdot P(D\mid\Theta)\cdot P(\Theta)", numbered=False),
+          P("Die Faktoren im Einzelnen (Schüler:in <i>i</i> in Kurs t(i), Kanal c ∈ {s, m}, Φ = Standardnormal-Verteilungsfunktion, "
+            "c<sub>0</sub> = −∞, c<sub>6</sub> = +∞):", body)]
+    rows = [
+        ("Zeugnisnote", r"P(N_i=k\mid\Theta)=\mathbf{1}\!\left[c_{k-1}<\theta_i\leq c_k\right],\qquad \theta_i=w\,\mu_{s,i}+(1-w)\,\mu_{m,i}"),
+        ("Klausuren", r"P(S\mid\Theta)=\prod_{i,j}\left[\Phi\!\left(\frac{c_{S_{ij}}-\mu_{s,i}}{\sigma_s}\right)-\Phi\!\left(\frac{c_{S_{ij}-1}-\mu_{s,i}}{\sigma_s}\right)\right]"),
+        ("mündlich", r"P(M\mid\Theta)=\prod_{i,k}\left[\Phi\!\left(\frac{c_{M_{ik}}-\mu_{m,i}}{\sigma_m}\right)-\Phi\!\left(\frac{c_{M_{ik}-1}-\mu_{m,i}}{\sigma_m}\right)\right]"),
+        ("Vornoten", r"P(V\mid\Theta)=\prod_{i}\prod_{c}\mathcal{N}\!\left(V_{c,i}\ ;\ (\alpha_c+\delta_v+u_{c,i})\mathbf{1},\ K\right),\quad K_{yy'}=\sigma_{drift}^{2}\min(y,y')+\sigma_v^{2}\mathbf{1}[y=y']"),
+        ("Lehrerurteil", r"P(D\mid\Theta)=\prod_{i}\left[\Phi\!\left(\frac{c_{D_i}-\theta_i}{\sigma_D}\right)-\Phi\!\left(\frac{c_{D_i-1}-\theta_i}{\sigma_D}\right)\right]\quad(\mathrm{optional})"),
+        ("Niveaus", r"\mu_{c,i}=\alpha_c+b_{t(i)}+u_{c,i}"),
+        ("Hierarchie", r"P(\Theta)=\prod_{i}\mathcal{N}(u_i\mid\mathbf{0},\Sigma)\ \prod_{t}\mathcal{N}(b_t\mid0,\tau_b^{2})\ \cdot\ P(\alpha)\,P(\tau)\,P(\rho)\,P(\tau_b)\,P(\sigma)\,P(\sigma_D)\,P(c)\,P(\delta_v)\,P(\sigma_{drift})\,P(\sigma_v)"),
+        ("Kovarianz", r"\Sigma=\mathrm{diag}(\tau)\,R(\rho)\,\mathrm{diag}(\tau),\qquad \Sigma_{sm}=\rho\,\tau_s\tau_m"),
+    ]
+    for lab, tx in rows:
+        img_ = tex_img(tx, 11.0)
+        avail = CONTENT_W - 2.3 * cm - 0.3 * cm
+        if img_.drawWidth > avail:
+            k_ = avail / img_.drawWidth
+            img_.drawWidth *= k_
+            img_.drawHeight *= k_
+        t_ = Table([[Paragraph(f"<b>{lab}</b>", cell), img_]], colWidths=[2.3 * cm, CONTENT_W - 2.3 * cm])
+        t_.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 3),
+                                ("BOTTOMPADDING", (0, 0), (-1, -1), 3), ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#d5dce6"))]))
+        s.append(t_)
+    s += [Spacer(1, 4),
+          P("Hyperpriors: α<sub>c</sub> ~ N(3,5; 1²); τ<sub>c</sub>, σ<sub>c</sub>, σ<sub>D</sub> ~ Half-Normal(1); τ<sub>b</sub>, σ<sub>drift</sub>, σ<sub>v</sub> ~ Half-Normal(0,5); "
+            "δ<sub>v</sub> ~ N(0; 0,5²); R ~ LKJ(2); innere Schwellen c<sub>2</sub>, c<sub>3</sub>, c<sub>4</sub> über Dirichlet(4,4,4,4)-Abstände "
+            "bei festen c<sub>1</sub> = 1,5 und c<sub>5</sub> = 5,5. In dieser Zusammenfassung sind u<sub>i</sub> und b<sub>t</sub> "
+            "direkt als Normalverteilungen geschrieben; die Implementierung nutzt eine äquivalente nicht-zentrierte Form "
+            "(Details in §3).", small),
+          P("Gesucht ist die Randverteilung der Note: P(N<sub>i</sub> = k | S, M, V, D) = ∫ P(N<sub>i</sub> = k | Θ) P(Θ | S, M, V, D) dΘ, "
+            "geschätzt als Anteil der Posterior-Ziehungen mit c<sub>k−1</sub> < θ<sub>i</sub> ≤ c<sub>k</sub>.", body),
+          PageBreak()]
+
+    # ---------------- Laienseite
+    th, sd = 2.71, 0.22
+    s += [P("Das Modell in einfachen Worten", h1),
+          P("<b>Grundidee.</b> Eine einzelne Note ist eine Momentaufnahme: Tagesform, Aufgabenauswahl und Rundung "
+            "verfälschen sie ein Stück. Hinter allen Noten steht aber ein „wahres“ Leistungsniveau. Das Modell "
+            "sucht dasjenige Niveau, das am besten zu <i>allen</i> vorhandenen Noten passt, und sagt ehrlich dazu, "
+            "wie sicher diese Aussage ist. Heraus kommt keine einzelne Zahl, sondern eine Wahrscheinlichkeit für jede Note."),
+          P("Welche Informationen einfließen", h2)]
+    zut = [["Information", "Wie sie wirkt"],
+           ["Klausuren", "Hauptsäule: Gewicht 2/3 an der Zeugnisnote."],
+           ["Mündliche Noten", "Gewicht 1/3. Wer schriftlich stark ist, ist meist auch mündlich stark; das nutzt das Modell."],
+           ["Vornoten", "Frühere Schuljahre zählen mit, aber ältere weniger. Sie helfen, wenn aktuell wenig Noten da sind."],
+           ["Kurs / Lehrkraft", "Manche Kurse benoten strenger oder milder. Das Modell rechnet diesen Unterschied heraus, bleibt aber in der Endnote sichtbar."],
+           ["Lehrerurteil (optional)", "Eine zusätzliche Einschätzung als weiterer Hinweis."]]
+    s += [table(zut, [4.0 * cm, CONTENT_W - 4.0 * cm]), Spacer(1, 4),
+          P("Vom Datensatz zur Zeugnisnote in vier Schritten", h2),
+          B("<b>1. Niveau schätzen.</b> Aus Klausuren und mündlichen Noten wird je Schüler:in ein Leistungsniveau je Kanal geschätzt, "
+            "ein Wert wie 2,7 auf der Notenskala."),
+          B("<b>2. Vorsichtig sein.</b> Gibt es nur wenige Noten, wird das Ergebnis zum Durchschnitt des Kurses hin „gezogen“. "
+            "Je mehr Noten vorliegen, desto mehr zählt die Person selbst."),
+          B("<b>3. Zusammenfassen.</b> Schriftliches und mündliches Niveau werden gewichtet (2/3 zu 1/3) zu einem Gesamtniveau verrechnet."),
+          B("<b>4. In Noten übersetzen.</b> Das Gesamtniveau ist nicht exakt bekannt. Das Modell spielt tausende plausible Werte durch "
+            "und zählt, wie oft sich welche Note ergibt."),
+          P("Ein Beispiel (erfunden)", h2),
+          P("Angenommen, das Gesamtniveau einer Schülerin liegt bei etwa 2,7 mit einer Unsicherheit von rund ±0,2. "
+            "Dann ergibt sich:")]
+    ex = Table([[fig_example(),
+                 Paragraph("<b>So liest man das:</b><br/>• Wahrscheinlichste Note: <b>3</b> (Median).<br/>"
+                           "• Realistische Spanne: <b>2 bis 3</b>. Notiert als „3 [2–3]“.<br/>"
+                           "• Eine 2 ist möglich (hier 17 %); eine 4 oder schlechter ist nach den Daten praktisch ausgeschlossen.", cell)]],
+               colWidths=[9.0 * cm, CONTENT_W - 9.0 * cm])
+    ex.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    s += [ex, Spacer(1, 3),
+          P("Was man daraus lernen kann", h2),
+          B("Wenn die Spanne „2–3“ lautet, sind die Daten nicht genauer. Das ist eine ehrliche Aussage und kein Mangel des Verfahrens: "
+            "Noten sind ganze Zahlen, das Niveau liegt aber oft zwischen zwei Stufen."),
+          B("Mit mehr Noten und mit Vornoten wird die Spanne enger. Im Simulationstest bekommt etwa jede:r Zweite mit vollen Daten eine eindeutige Note, "
+            "ohne Vornoten nur etwa jede:r Vierte."),
+          B("Das Modell <b>ersetzt kein pädagogisches Urteil</b>. Es zeigt, wie belastbar eine Note ist, und macht Grenzfälle sichtbar."),
+          B("Alle bisherigen Tests nutzen ausschließlich <b>simulierte</b> Daten, keine echten Schülerdaten."),
+          PageBreak()]
+    return s
+
+
 def story():
     s = []
     s += [P("Das hierarchische Bayes-Modell zur Zeugnisnote", title),
@@ -241,6 +352,8 @@ def story():
             "(<font name='SerifI'>src/noten/models.py, simulate.py, mapping.py</font>). "
             "Alle Daten sind simuliert; Zahlen aus Simulationsstudien stammen aus "
             "<font name='SerifI'>reports/ERGEBNISSE.md</font>.", small)]
+
+    s += summary_pages()
 
     # 1 ------------------------------------------------------------------------------------
     s += [P("1  Zielsetzung und Aufbau", h1),

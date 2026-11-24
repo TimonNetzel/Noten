@@ -96,13 +96,16 @@ def recovery(idata, data: GradeData) -> list[dict]:
     """Recovery-Zeilen (eine je Parametergruppe) mit Trefferquoten in 50/80/95-%-Intervallen."""
     t = data.truth
     # Vergleichsgrößen passend zur Parametrisierung des Modells:
-    # - Kurseffekte sind sum-to-zero -> Wahrheit b_t - mean(b), Kanalmittel alpha_c + mean(b)
+    # - Kurseffekte sind sum-to-zero -> Wahrheit b_t - mean(b), Kanalmittel alpha_c + mean(b),
+    #   Vornoten-Offset delta_v - mean(b)
     # - sigma_v absorbiert den Rundungsfehler der Vornoten (Var 1/12) -> effektiver Wert
     bbar = float(np.mean(t["b"]))
     t = dict(t)
     t["b"] = t["b"] - bbar
     t["alpha_s"] = t["alpha_s"] + bbar
     t["alpha_m"] = t["alpha_m"] + bbar
+    # Vornoten-Mittel = alpha_c + delta_v (ohne b) -> im Modell entspricht delta_v - mean(b)
+    t["delta_v"] = t["delta_v"] - bbar
     t["sigma_v"] = float(np.sqrt(t["sigma_v"] ** 2 + 1 / 12))
     rows = []
     groups = {

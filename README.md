@@ -128,7 +128,9 @@ Bei Unklarheiten wurde ohne Rückfrage eine begründete Annahme getroffen:
     fehlt, wird `pm.sample` verwendet. Die Ordinal-Likelihood ist eine eigene, zu `pm.OrderedProbit`
     äquivalente Implementierung (Test `test_custom_ordinal_matches_pymc_orderedprobit`), die nur die zwei
     relevanten Schwellen je Beobachtung auswertet (~2× schneller).
-13. **Repository war leer** (kein `main`). Der Pull Request braucht einen `main`-Branch als Basis
+13. **Speicher:** Die Worker-Prozesse wachsen um ≈ 100 MB pro Fit (Kompilier-Caches). Der Pool startet
+    die Worker deshalb alle 8 Fits neu (`max_tasks_per_child=8`).
+14. **Repository war leer** (kein `main`). Der Pull Request braucht einen `main`-Branch als Basis
     (siehe PR-Beschreibung).
 
 ## Struktur
@@ -163,7 +165,7 @@ Alle Experimente in Schnellkonfiguration (CI, wenige Minuten, Ausgabe nach `repo
 python scripts/run_experiments.py all --quick --workers 2
 ```
 
-Volle Konfiguration (30 Läufe je Kernszenario, ≈ 1,5 h auf 4 Kernen):
+Volle Konfiguration (30 Läufe je Kernszenario, ≈ 1,5 h auf 4 Kernen; Recovery allein ≈ 45 min):
 
 ```bash
 python scripts/run_experiments.py all --workers 4

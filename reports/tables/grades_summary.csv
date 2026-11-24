@@ -1,0 +1,4 @@
+modell,Ø_breite_θ80,Ø_breite_note80,anteil_einzelnote,median=wahr,abdeckung80_note,rmse_θ,diag_ok
+mit Vornoten,0.5611455664158185,1.545,0.455,0.85,0.98,0.1965940912915024,True
+ohne Vornoten,0.7398419909135525,1.76,0.24,0.775,0.99,0.2735439862883152,True
+naiv: gewichteter Schnitt gerundet,,,,0.76,,0.2785103245243971,
